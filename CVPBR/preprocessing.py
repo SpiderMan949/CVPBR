@@ -48,10 +48,7 @@ def _read_file(fpath: str) -> pd.DataFrame:
 
 
 def _resolve_columns(df: pd.DataFrame, project: str) -> pd.DataFrame | None:
-    """
-    Normalize column names to {title, description, label}.
-    Returns the cleaned DataFrame, or None if required columns are missing.
-    """
+
     col_map = {c.strip().lower(): c for c in df.columns}   # lower → original
 
     resolved = {}
@@ -97,12 +94,7 @@ def _encode_label(series: pd.Series, project: str) -> pd.Series:
 
 
 def load_project_data(data_dir: str) -> dict[str, pd.DataFrame]:
-    """
-    Load bug reports from all XLSX / CSV files in data_dir.
-    Each file → one project (filename without extension = project name).
-
-    Returns dict: {project_name: DataFrame[title, description, label, project]}
-    """
+ 
     project_data = {}
     supported = (".xlsx", ".xls", ".xlsm", ".csv")
     files = [f for f in os.listdir(data_dir)
@@ -171,10 +163,6 @@ def preprocess_text(text: str) -> list[str]:
 
 
 def train_word2vec(sentences: list[list[str]], save_path: str = None) -> Word2Vec:
-    """
-    Train a Word2Vec Skip-gram model on all tokenized sentences.
-    dim=200, window=5, min_count=5  (Section 3.1)
-    """
     logger.info("Training Word2Vec model ...")
     model = Word2Vec(
         sentences=sentences,
@@ -192,11 +180,7 @@ def train_word2vec(sentences: list[list[str]], save_path: str = None) -> Word2Ve
 
 
 def tokens_to_matrix(tokens: list[str], max_len: int, wv) -> np.ndarray:
-    """
-    Convert token list to a fixed-size matrix (max_len × dim).
-    - Truncate if longer than max_len.
-    - Pad with zero-vectors if shorter.
-    """
+
     dim = wv.vector_size
     matrix = np.zeros((max_len, dim), dtype=np.float32)
     for i, token in enumerate(tokens[:max_len]):
