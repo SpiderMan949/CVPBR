@@ -1,17 +1,3 @@
-"""
-Stage 3: Cluster Adjustment (Section 3.3)
-
-Algorithm 2 – Global Standard Deviation Minimization
-  Constraints:
-    - intra-cluster total samples >= N  (default 3000)
-    - positive-to-negative ratio in [R_min, R_max]  (default [1/1.6, 1.6])
-
-Algorithm 3 – Interference Ratio Based Adjustment
-  Extra step: compute Interference Ratio (Formula 2) per project;
-  projects below threshold α=0.05 are bound together and
-  moved as a unit through Algorithm 2.
-"""
-
 import os
 import logging
 import itertools
@@ -25,10 +11,6 @@ import config
 
 logger = logging.getLogger(__name__)
 
-
-# ------------------------------------------------------------------ #
-#  Helpers                                                             #
-# ------------------------------------------------------------------ #
 
 def _cluster_counts(clusters: dict, processed_data: dict) -> dict:
     """Return {cid: (n_valid, n_invalid)} for current cluster assignment."""
@@ -66,26 +48,11 @@ def _constraints_satisfied(clusters: dict, processed_data: dict) -> bool:
     return True
 
 
-# ------------------------------------------------------------------ #
-#  Algorithm 2: Global Standard Deviation Minimization                 #
-# ------------------------------------------------------------------ #
-
 def adjustment_strategy_1(clusters: dict[int, list[str]],
                            processed_data: dict,
                            movable_projects: list[str] = None
                            ) -> dict[int, list[str]]:
-    """
-    Algorithm 2: iteratively reassign imbalanced projects to minimise
-    global std of (n_invalid - n_valid) across clusters, subject to
-    min sample size N and ratio [R_min, R_max].
 
-    Parameters
-    ----------
-    clusters         : initial clustering {cid: [project, ...]}
-    processed_data   : preprocessed data per project
-    movable_projects : if given, only these are candidates for reassignment
-                       (used by Algorithm 3 for bound groups)
-    """
     import copy
     clusters = copy.deepcopy(clusters)
 
@@ -172,10 +139,6 @@ def adjustment_strategy_1(clusters: dict[int, list[str]],
     return clusters
 
 
-# ------------------------------------------------------------------ #
-#  Interference Ratio (Formula 2)                                      #
-# ------------------------------------------------------------------ #
-
 def _top_words(token_lists: list[list[str]], top_pct: float = config.TOP_WORD_PERCENT) -> set[str]:
     """Return the top `top_pct` fraction of words by frequency."""
     counter: Counter = Counter()
@@ -186,21 +149,6 @@ def _top_words(token_lists: list[list[str]], top_pct: float = config.TOP_WORD_PE
 
 
 def interference_ratio(cluster_members: list[str], processed_data: dict) -> dict[str, float]:
-    """
-    Compute per-project Interference Ratio (Formula 2) for every project
-    in a cluster.
-
-    Formula:
-        IR = |W_all| / (|I_all| + |V_all| - |W_all|)
-    where
-        I_all = union of top-5% invalid-report words across all projects
-        V_all = union of top-5% valid-report words across all projects
-        W_all = I_all ∩ V_all
-
-    We compute this for each project by treating it as a "leave-one-in"
-    contribution: its own interference = |W_p| / (|I_p| + |V_p| - |W_p|)
-    where I_p / V_p are its own top words.
-    """
     ratios = {}
     for p in cluster_members:
         data = processed_data[p]
@@ -219,19 +167,10 @@ def interference_ratio(cluster_members: list[str], processed_data: dict) -> dict
     return ratios
 
 
-# ------------------------------------------------------------------ #
-#  Algorithm 3: Interference Ratio Based Adjustment                    #
-# ------------------------------------------------------------------ #
 
 def adjustment_strategy_2(clusters: dict[int, list[str]],
                            processed_data: dict) -> dict[int, list[str]]:
-    """
-    Algorithm 3: interference-ratio-aware version of Algorithm 2.
-
-    1. For each cluster, compute interference ratio per project.
-    2. Projects with IR < α are "bound" together.
-    3. Bound groups are moved collectively through Algorithm 2.
-    """
+    
     import copy
     clusters = copy.deepcopy(clusters)
 
@@ -264,19 +203,10 @@ def adjustment_strategy_2(clusters: dict[int, list[str]],
     return adjusted
 
 
-# ------------------------------------------------------------------ #
-#  Public entry point                                                  #
-# ------------------------------------------------------------------ #
 
 def adjust_clusters(clusters: dict[int, list[str]],
                     processed_data: dict,
                     strategy: str = "S3") -> dict[int, list[str]]:
-    """
-    strategy : "S1" | "S2" | "S3"
-      S1 = Algorithm 2 only
-      S2 = Algorithm 2 only (alias, for ablation study)
-      S3 = Algorithm 3 (CVCBR full method)
-    """
     logger.info(f"Running cluster adjustment with strategy={strategy}")
     if strategy in ("S1", "S2"):
         return adjustment_strategy_1(clusters, processed_data)
