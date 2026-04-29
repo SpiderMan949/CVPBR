@@ -1,14 +1,3 @@
-"""
-Stage 4: CNN Model Training (Section 3.4)
-
-Architecture per cluster:
-  Input  : title (10×200) + description (50×200)
-  Conv   : title → kernels [1,2,3]×200, n=128 each  → GlobalMaxPool → concat
-            desc  → kernels [2,3,4]×200, n=128 each  → GlobalMaxPool → concat
-  Fusion : concat all → FC(1, sigmoid)
-  Opt    : Adam lr=1e-4,  EarlyStopping patience=5 on val_loss
-"""
-
 import os
 import logging
 import numpy as np
@@ -27,17 +16,10 @@ import config
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------------------ #
-#  PyTorch Dataset                                                     #
-# ------------------------------------------------------------------ #
 
 class BugReportDataset(Dataset):
     def __init__(self, title_vecs: np.ndarray, desc_vecs: np.ndarray, labels: np.ndarray):
-        """
-        title_vecs : (N, TITLE_MAX_LEN, DIM)
-        desc_vecs  : (N, DESC_MAX_LEN, DIM)
-        labels     : (N,)
-        """
+
         self.titles = torch.tensor(title_vecs, dtype=torch.float32)
         self.descs  = torch.tensor(desc_vecs,  dtype=torch.float32)
         self.labels = torch.tensor(labels,     dtype=torch.float32)
@@ -49,17 +31,9 @@ class BugReportDataset(Dataset):
         return self.titles[idx], self.descs[idx], self.labels[idx]
 
 
-# ------------------------------------------------------------------ #
-#  CNN Architecture                                                    #
-# ------------------------------------------------------------------ #
 
 class TextCNN(nn.Module):
-    """
-    Dual-input CNN for bug report validity classification.
-    Title branch  : kernel widths [1,2,3]
-    Desc  branch  : kernel widths [2,3,4]
-    Both branches: n_filters=128, GlobalMaxPool, then concat + sigmoid.
-    """
+
 
     def __init__(self,
                  embed_dim: int = config.WORD2VEC_DIM,
@@ -117,9 +91,6 @@ class TextCNN(nn.Module):
         return out.squeeze(1)
 
 
-# ------------------------------------------------------------------ #
-#  Training routine                                                    #
-# ------------------------------------------------------------------ #
 
 def train_one_cluster(cluster_id: int,
                       members: list[str],
