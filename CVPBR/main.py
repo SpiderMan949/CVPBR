@@ -1,30 +1,3 @@
-"""
-CVCBR — Main Pipeline
-======================
-Experimental protocol (Section 4):
-
-1. Time-aware train/test split
-   - Bug reports sorted chronologically per project
-   - Split into 10 equal segments; first 9 = train, last 1 = test
-   - ALL subsequent steps (clustering, adjustment, training) use TRAIN only
-   - Test set is held out until final evaluation
-
-2. Multi-seed repetition
-   - Repeat full experiment with 5 different random seeds
-   - Report mean (± std) across seeds for every metric
-
-3. Statistical analysis
-   - Wilcoxon signed-rank test  (CVCBR vs each baseline)
-   - Cliff's δ effect size
-   - 95% bootstrap confidence intervals for key metrics
-
-Usage
------
-    python main.py [--strategy S3] [--data_dir ./data]
-                   [--seeds 42,0,1,2,3] [--n_segments 10]
-                   [--train_segments 9]
-"""
-
 import os
 import sys
 import json
@@ -62,9 +35,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ======================================================================
-#  CLI
-# ======================================================================
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CVCBR full pipeline")
@@ -81,9 +51,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# ======================================================================
-#  Time-aware train/test split  (Section 4: time-aware setting)
-# ======================================================================
 
 _TIME_COL_ALIASES = {
     "created_at", "created", "date", "timestamp", "time",
@@ -109,19 +76,6 @@ def time_aware_split(project_data: dict,
                      train_segments: int = 9,
                      time_col: str | None = None
                      ) -> tuple[dict, dict]:
-    """
-    For each project, sort bug reports chronologically, divide into
-    `n_segments` equal-size segments. First `train_segments` → train,
-    remaining → test.
-
-    If no time column is found the existing row order is used as a
-    proxy for submission order (common for GitHub data exports).
-
-    Returns
-    -------
-    train_data : {project: DataFrame}
-    test_data  : {project: DataFrame}
-    """
     train_data, test_data = {}, {}
 
     for project, df in project_data.items():
@@ -163,18 +117,10 @@ def time_aware_split(project_data: dict,
     return train_data, test_data
 
 
-# ======================================================================
-#  Vectorise a pre-split DataFrame using an existing Word2Vec model
-# ======================================================================
 
 def vectorize_df_dict(df_dict: dict,
                       w2v_model,
                       token_cache: dict | None = None) -> dict:
-    """
-    Vectorize a {project: DataFrame} dict using an already-trained Word2Vec.
-    `token_cache` (optional): {project: [(title_tokens, desc_tokens), ...]}
-    for efficiency if tokens were already computed during W2V training.
-    """
     from preprocessing import preprocess_text, vectorize_report
     wv = w2v_model.wv
     processed = {}
@@ -209,9 +155,6 @@ def vectorize_df_dict(df_dict: dict,
     return processed
 
 
-# ======================================================================
-#  CNN training (single run, train → val split inside cluster)
-# ======================================================================
 
 def _metrics(labels, scores):
     binary = (np.array(scores) >= 0.5).astype(int)
@@ -292,9 +235,6 @@ def infer(model: torch.nn.Module, data: dict,
     return np.array(scores)
 
 
-# ======================================================================
-#  One full experiment run (single seed)
-# ======================================================================
 
 def concat_cluster(members: list, processed: dict) -> dict:
     """Concatenate title_vecs / desc_vecs / labels across cluster members."""
@@ -310,13 +250,7 @@ def run_single_seed(seed: int,
                     test_df:  dict,
                     strategy: str,
                     device:   torch.device) -> dict:
-    """
-    One complete CVCBR experiment for a given seed.
 
-    Returns
-    -------
-    {project: {metric: value, ...}}
-    """
     logger.info(f"\n{'='*60}")
     logger.info(f"  SEED {seed}")
     logger.info(f"{'='*60}")
@@ -406,17 +340,8 @@ def run_single_seed(seed: int,
     return project_results
 
 
-# ======================================================================
-#  Statistical analysis
-# ======================================================================
 
 def cliffs_delta(x: list[float], y: list[float]) -> float:
-    """
-    Cliff's δ = (#{x > y} - #{x < y}) / (n*m)
-    Measures effect size between two unpaired groups.
-    Interpretation: |δ| < 0.147 negligible, < 0.33 small,
-                    < 0.474 medium, >= 0.474 large.
-    """
     n, m = len(x), len(y)
     if n == 0 or m == 0:
         return float("nan")
@@ -429,9 +354,7 @@ def bootstrap_ci(values: list[float],
                  n_boot: int = 2000,
                  alpha: float = 0.05,
                  seed: int = 42) -> tuple[float, float]:
-    """
-    95% bootstrap confidence interval (percentile method).
-    """
+    
     rng  = np.random.RandomState(seed)
     boot = [np.mean(rng.choice(values, size=len(values), replace=True))
             for _ in range(n_boot)]
@@ -441,10 +364,7 @@ def bootstrap_ci(values: list[float],
 
 
 def wilcoxon_test(x: list[float], y: list[float]) -> tuple[float, float]:
-    """
-    Wilcoxon signed-rank test (paired).
-    Returns (statistic, p_value).
-    """
+
     if len(x) < 2 or len(x) != len(y):
         return float("nan"), float("nan")
     try:
@@ -455,13 +375,7 @@ def wilcoxon_test(x: list[float], y: list[float]) -> tuple[float, float]:
 
 
 def aggregate_seeds(seed_results: list[dict]) -> dict:
-    """
-    Aggregate {seed: {project: {metric: value}}} across seeds.
 
-    Returns
-    -------
-    {project: {metric_mean, metric_std, metric_ci_lo, metric_ci_hi, ...}}
-    """
     # Collect all projects
     all_projects = set()
     for sr in seed_results:
@@ -507,19 +421,7 @@ def aggregate_seeds(seed_results: list[dict]) -> dict:
 def statistical_comparison(cvcbr_seed_results: list[dict],
                             baseline_seed_results: dict[str, list[dict]],
                             metric: str = "AUC") -> dict:
-    """
-    Compare CVCBR against each baseline using Wilcoxon + Cliff's δ.
 
-    Parameters
-    ----------
-    cvcbr_seed_results   : list of {project: {metric: val}} over seeds
-    baseline_seed_results: {baseline_name: list of {project: {metric: val}}}
-    metric               : metric to compare (default: "AUC")
-
-    Returns
-    -------
-    {baseline_name: {stat, p_value, cliffs_delta, interpretation}}
-    """
     def collect_values(seed_results_list):
         """Flatten to a list of per-project-per-seed values."""
         vals = []
@@ -568,9 +470,6 @@ def statistical_comparison(cvcbr_seed_results: list[dict],
     return results
 
 
-# ======================================================================
-#  Save results
-# ======================================================================
 
 def save_all_results(aggregated: dict,
                      stat_tests: dict,
@@ -620,9 +519,6 @@ def save_all_results(aggregated: dict,
     return df, overall
 
 
-# ======================================================================
-#  Main
-# ======================================================================
 
 def main():
     args   = parse_args()
@@ -635,15 +531,11 @@ def main():
                 f"train={args.train_segments}, test={args.n_segments - args.train_segments}")
     logger.info("=" * 60)
 
-    # ------------------------------------------------------------------
-    # Load raw data
-    # ------------------------------------------------------------------
+
     logger.info("\n[Step 0] Loading raw data ...")
     raw_project_data = load_project_data(args.data_dir)
 
-    # ------------------------------------------------------------------
-    # Time-aware train/test split  (done ONCE, before any seed loop)
-    # ------------------------------------------------------------------
+
     logger.info("\n[Step 1] Time-aware train/test split ...")
     train_df, test_df = time_aware_split(
         raw_project_data,
@@ -658,9 +550,7 @@ def main():
         if len(vc) < 2:
             logger.warning(f"[{proj}] test set has only one class: {vc.to_dict()}")
 
-    # ------------------------------------------------------------------
-    # Multi-seed experiment loop
-    # ------------------------------------------------------------------
+
     logger.info(f"\n[Step 2] Running {len(seeds)} seeds ...")
     all_seed_results: list[dict] = []
 
@@ -677,16 +567,11 @@ def main():
         )
         all_seed_results.append(result)
 
-    # ------------------------------------------------------------------
-    # Aggregate across seeds
-    # ------------------------------------------------------------------
+
     logger.info("\n[Step 3] Aggregating results across seeds ...")
     aggregated = aggregate_seeds(all_seed_results)
 
-    # ------------------------------------------------------------------
-    # Statistical tests (placeholder — populate baseline_results
-    # with actual baseline runs to enable comparison)
-    # ------------------------------------------------------------------
+
     logger.info("\n[Step 4] Statistical analysis ...")
     # NOTE: To compare against baselines (CNN / BERT / Fine-tuned BERT),
     # run those baselines and pass their seed results here.
@@ -716,15 +601,11 @@ def main():
         stat_tests["overall_AUC_CI"] = {"ci_lo": ci_lo, "ci_hi": ci_hi,
                                          "mean": round(float(np.mean(all_aucs)), 4)}
 
-    # ------------------------------------------------------------------
-    # Save
-    # ------------------------------------------------------------------
+
     logger.info("\n[Step 5] Saving results ...")
     df, overall = save_all_results(aggregated, stat_tests, args.strategy, seeds)
 
-    # ------------------------------------------------------------------
-    # Final summary
-    # ------------------------------------------------------------------
+
     logger.info("\n" + "=" * 60)
     logger.info(f"Final Results  (strategy={args.strategy}, "
                 f"{len(seeds)} seeds × time-aware split)")
