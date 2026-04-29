@@ -11,7 +11,6 @@ import config
 
 logger = logging.getLogger(__name__)
 
-
 def project_centroid(processed_data: dict, project: str) -> np.ndarray:
     """
     Represent a project as the mean of all its report vectors.
