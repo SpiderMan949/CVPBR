@@ -1,8 +1,3 @@
-# ============================================================
-# CVCBR Configuration
-# Paper: "CVCBR: Clustering-based Validity Classification of Bug Reports"
-# ============================================================
-
 import os
 
 # --- Paths ---
@@ -22,19 +17,18 @@ WORD2VEC_SG = 1             # 1 = Skip-gram
 
 # --- Spectral Clustering ---
 CLUSTER_K_RANGE = None      # None => auto-detect from [1, n_projects]
-# Weighted score weights (Section 3.2, Formula 1)
 W_SILHOUETTE = 0.7
 W_CH = 0.15
 W_DB = 0.15
 
-# --- Cluster Adjustment (Algorithm 2 & 3) ---
-MIN_CLUSTER_SIZE = 3000     # N: minimum intra-cluster sample size (Section 4.5)
-R_MAX = 1.6                 # positive-to-negative ratio upper bound (Section 4.5)
+
+MIN_CLUSTER_SIZE = 3000     # N: minimum intra-cluster sample size 
+R_MAX = 1.6                 # positive-to-negative ratio upper bound 
 R_MIN = 1 / R_MAX           # => [1/1.6, 1.6]
-INTERFERENCE_ALPHA = 0.05   # threshold α for interference ratio (Section 3.3.2)
+INTERFERENCE_ALPHA = 0.05   # threshold α for interference ratio 
 TOP_WORD_PERCENT = 0.05     # top 5% word frequency for interference ratio
 
-# --- CNN Model (Section 3.4) ---
+# --- CNN Model  ---
 TITLE_KERNEL_SIZES = [1, 2, 3]
 DESC_KERNEL_SIZES = [2, 3, 4]
 NUM_FILTERS = 128
@@ -45,7 +39,6 @@ MAX_EPOCHS = 50
 EARLY_STOPPING_PATIENCE = 5  # stop if loss does not drop for 5 epochs
 
 # --- Evaluation / Experiment Protocol ---
-# Time-aware split (Section 4)
 N_SEGMENTS     = 10    # divide each project into 10 equal time segments
 TRAIN_SEGMENTS = 9     # first 9 → train, last 1 → test
 
