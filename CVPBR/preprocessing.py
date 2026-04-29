@@ -1,17 +1,3 @@
-"""
-Stage 1: Data Preprocessing (Section 3.1)
-Steps:
-  1. Text Extraction  - title + description fields
-  2. Normalization    - lowercase via NLTK
-  3. Tokenization & Stop Word Removal - NLTK
-  4. Text Vectorization - Word2Vec (Skip-gram, dim=200, window=5)
-  5. Truncation & Padding - title→10 words, desc→50 words
-
-Data format: one XLSX (or CSV) per project in data_dir.
-Required columns (case-insensitive): title, description, label
-  label: 1 = valid, 0 = invalid
-"""
-
 import os
 import re
 import logging
@@ -48,9 +34,6 @@ _COL_ALIASES = {
 }
 
 
-# ------------------------------------------------------------------ #
-#  1. Load raw data (XLSX + CSV)                                       #
-# ------------------------------------------------------------------ #
 
 def _read_file(fpath: str) -> pd.DataFrame:
     """Read a single data file (xlsx or csv) into a DataFrame."""
@@ -166,9 +149,6 @@ def load_project_data(data_dir: str) -> dict[str, pd.DataFrame]:
     return project_data
 
 
-# ------------------------------------------------------------------ #
-#  2. Text cleaning helpers                                            #
-# ------------------------------------------------------------------ #
 
 def normalize(text: str) -> str:
     """Lowercase; keep only alphabetic characters and spaces."""
@@ -190,10 +170,6 @@ def preprocess_text(text: str) -> list[str]:
     return tokenize_and_remove_stopwords(normalize(text))
 
 
-# ------------------------------------------------------------------ #
-#  3. Word2Vec training                                                #
-# ------------------------------------------------------------------ #
-
 def train_word2vec(sentences: list[list[str]], save_path: str = None) -> Word2Vec:
     """
     Train a Word2Vec Skip-gram model on all tokenized sentences.
@@ -214,9 +190,6 @@ def train_word2vec(sentences: list[list[str]], save_path: str = None) -> Word2Ve
     return model
 
 
-# ------------------------------------------------------------------ #
-#  4. Vectorise a single report                                        #
-# ------------------------------------------------------------------ #
 
 def tokens_to_matrix(tokens: list[str], max_len: int, wv) -> np.ndarray:
     """
@@ -241,26 +214,11 @@ def vectorize_report(title_tokens: list[str],
     return title_vec, desc_vec
 
 
-# ------------------------------------------------------------------ #
-#  5. Full preprocessing pipeline                                      #
-# ------------------------------------------------------------------ #
 
 def preprocess_all(project_data: dict[str, pd.DataFrame],
                    w2v_save_path: str = None
                    ) -> tuple[dict, Word2Vec]:
-    """
-    Run the full preprocessing pipeline over all projects.
 
-    Returns
-    -------
-    processed : dict
-        {project: {"title_vecs": np.ndarray,   # (N, TITLE_MAX_LEN, DIM)
-                   "desc_vecs":  np.ndarray,   # (N, DESC_MAX_LEN, DIM)
-                   "labels":     np.ndarray,   # (N,)
-                   "title_tokens": list,
-                   "desc_tokens":  list}}
-    w2v_model : Word2Vec
-    """
     # --- collect all sentences for W2V training ---
     all_sentences = []
     token_cache = {}   # project -> list of (title_tokens, desc_tokens)
@@ -300,10 +258,6 @@ def preprocess_all(project_data: dict[str, pd.DataFrame],
 
     return processed, w2v_model
 
-
-# ------------------------------------------------------------------ #
-#  6. Subset helper (used by cross-validation)                         #
-# ------------------------------------------------------------------ #
 
 def subset_data(data: dict, idx: np.ndarray) -> dict:
     """Return a sub-dict with only the given indices."""
