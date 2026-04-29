@@ -1,13 +1,3 @@
-"""
-Stage 2: Project Pre-Clustering (Section 3.2)
-- Represent each project as a mean TF-IDF / Word2Vec centroid vector
-- Measure inter-project similarity via Sinkhorn distance
-- Apply Spectral Clustering for k = 1..n_projects
-- Select optimal k using weighted composite score (Formula 1):
-    Score_k = w_s * SC_norm + w_c * CH_norm + w_d * (1 - DB_norm)
-  with w_s=0.7, w_c=0.15, w_d=0.15
-"""
-
 import os
 import logging
 import numpy as np
@@ -21,10 +11,6 @@ import config
 
 logger = logging.getLogger(__name__)
 
-
-# ------------------------------------------------------------------ #
-#  Project-level feature representation                                #
-# ------------------------------------------------------------------ #
 
 def project_centroid(processed_data: dict, project: str) -> np.ndarray:
     """
@@ -45,10 +31,6 @@ def build_project_matrix(processed_data: dict) -> tuple[np.ndarray, list[str]]:
     X = np.stack([project_centroid(processed_data, p) for p in projects])
     return X, projects
 
-
-# ------------------------------------------------------------------ #
-#  Sinkhorn (approximate OT) similarity / affinity matrix             #
-# ------------------------------------------------------------------ #
 
 def sinkhorn_distance_approx(a: np.ndarray, b: np.ndarray,
                               reg: float = 0.1, n_iter: int = 50) -> float:
@@ -74,10 +56,6 @@ def build_affinity_matrix(X: np.ndarray, gamma: float = 1.0) -> np.ndarray:
             A[i, j] = np.exp(-gamma * d ** 2)
     return A
 
-
-# ------------------------------------------------------------------ #
-#  Composite clustering score (Formula 1)                             #
-# ------------------------------------------------------------------ #
 
 def compute_composite_scores(X: np.ndarray,
                               k_range: range) -> tuple[list[float], list[np.ndarray]]:
@@ -139,10 +117,6 @@ def compute_composite_scores(X: np.ndarray,
     return scores, labels_list
 
 
-# ------------------------------------------------------------------ #
-#  Algorithm 1: Optimal Cluster Number Selection                       #
-# ------------------------------------------------------------------ #
-
 def pre_cluster_projects(processed_data: dict) -> tuple[dict[str, list[str]], np.ndarray, list[str]]:
     """
     Algorithm 1 from the paper.
@@ -182,10 +156,6 @@ def pre_cluster_projects(processed_data: dict) -> tuple[dict[str, list[str]], np
 
     return clusters, X, projects
 
-
-# ------------------------------------------------------------------ #
-#  Cluster statistics helper                                           #
-# ------------------------------------------------------------------ #
 
 def cluster_stats(clusters: dict[int, list[str]],
                   processed_data: dict) -> dict[int, dict]:
